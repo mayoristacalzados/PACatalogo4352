@@ -43,12 +43,6 @@ header{padding:12px;background:#fff;border-bottom:1px solid var(--line)}
 .stepper{display:flex;align-items:center;gap:8px}
 .stepper button{width:34px;height:34px;border-radius:9px;border:none;background:var(--accent);color:#fff;font-size:20px;font-weight:700;cursor:pointer}
 .stepper .q{flex:1;text-align:center;font-weight:700;font-size:15px}
-.vrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
-.vrow .vlbl{font-weight:700;font-size:14px}
-.vrow .vlbl small{display:block;color:var(--muted);font-weight:500;font-size:11px;margin-top:2px}
-.stepper.sm{gap:6px}
-.stepper.sm button{width:30px;height:30px;font-size:18px;border-radius:8px}
-.stepper.sm .q{flex:none;min-width:28px;font-size:14px}
 .btn{width:100%;border:none;background:var(--accent);color:#fff;font-family:var(--display);font-weight:700;font-size:14px;padding:10px;border-radius:11px;cursor:pointer}
 .btn.alt{background:#fff;color:var(--accent);border:1.5px solid var(--accent)}
 .cartbar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--ink);color:#fff;padding:12px 14px;display:none;align-items:center;justify-content:space-between;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
@@ -114,7 +108,7 @@ header{padding:12px;background:#fff;border-bottom:1px solid var(--line)}
 <div class="field"><label>Teléfono</label><input id="fTel" placeholder="Opcional"></div>
 <div class="field"><label>Tomado por (vendedor)</label><input id="fVend" placeholder="Opcional"></div>
 <div class="field"><label>Observaciones</label><textarea id="fObs" rows="2"></textarea></div>
-<div class="field"><label>WhatsApp destino (número)</label><input id="fDest" placeholder="Ej. 5076XXXXXXX"><div style="font-size:11.5px;color:var(--muted);margin-top:5px">Si dejas el número vacío, al enviar WhatsApp te dejará elegir un contacto de tu teléfono.</div></div>
+<div class="field"><label>WhatsApp destino (número)</label><input id="fDest" placeholder="Ej. 5076XXXXXXX"></div>
 <button class="btn" onclick="enviarWhatsApp()">Enviar texto por WhatsApp</button>
 <div style="height:8px"></div>
 <button class="btn alt" onclick="compartirPDF()">Generar PDF y compartir 📄</button>
@@ -622,8 +616,8 @@ function setQtySimple(id,q){var c=byId[id];if(NO_OVERSELL){var mx=maxBultos(c.id
 /* ---- modal configurador ---- */
 function openModal(id){var c=byId[id];document.getElementById('mTitle').textContent=c.referencia;
   if(c.kind==='simple')renderSimpleModal(c);
-  else if(c.kind==='escolar'){mState={kind:'escolar',cardId:id,rowQty:{}};renderEscModal();}
-  else {var col=c.colors[0],alt=mFirstAltura(c,col);mState={kind:'media',cardId:id,color:col,altura:alt,rowQty:{}};renderMedModal();}
+  else if(c.kind==='escolar'){mState={kind:'escolar',cardId:id,corrida:0,qty:1};renderEscModal();}
+  else {var col=c.colors[0],alt=mFirstAltura(c,col),tal=mFirstTalla(c,col,alt);mState={kind:'media',cardId:id,color:col,altura:alt,talla:tal,qty:1};renderMedModal();}
   showSheet('modal');
 }
 function renderSimpleModal(c){
@@ -654,65 +648,59 @@ function refreshAlert(){var vv=curVariant();var prevQty=order[vv.key]?order[vv.k
   else { el.innerHTML = pares>rem ? '<div class="alert">⚠ Sobreventa: pedirías '+pares+' prs y hay '+rem+' prs.</div>' : ''; }
 }
 /* escolar */
-function renderEscModal(){var c=byId[mState.cardId];if(!mState.rowQty)mState.rowQty={};
+function renderEscModal(){var c=byId[mState.cardId];var co=c.corridas[mState.corrida];
   var photo=(c.imgs&&c.imgs.length)?'<div class="gal galwrap">'+c.imgs.map(i=>'<img src="'+IMAGES[i]+'">').join('')+'</div>':'<div class="mphoto ph">GK</div>';
   var colors=c.colorsAvail.map(x=>'<div class="opt'+(x.id===mState.cardId?' on':'')+'" onclick="escColor(\''+x.id+'\')">'+x.name+'</div>').join('');
-  var rows=c.corridas.map((x,i)=>{var q=mState.rowQty[i]||0;var rem=remPares('esc|'+c.estilo+'|'+x.corrida,x.stock);
-    return '<div class="vrow"><div class="vlbl">'+x.corrida+'<small>'+fmt(x.precio)+'/par · bulto '+fmt(x.precio*x.paresBulto)+' · '+rem+' prs</small></div>'
-      +'<div class="stepper sm"><button onclick="escRow('+i+',-1)">−</button><div class="q">'+q+'</div><button onclick="escRow('+i+',1)">+</button></div></div>';}).join('');
+  var corr=c.corridas.map((x,i)=>'<div class="opt'+(i===mState.corrida?' on':'')+'" onclick="escCorrida('+i+')">'+x.corrida+'</div>').join('');
+  var rem=remPares('esc|'+c.estilo+'|'+co.corrida,co.stock);
   document.getElementById('mBody').innerHTML=photo
     +'<div class="sec">Color</div><div class="opts">'+colors+'</div>'
-    +'<div class="sec">Numeración (corrida) — elige una o varias</div>'+rows
-    +'<button class="btn" style="margin-top:14px" onclick="addEscSelected()">Agregar al carrito</button>';
-  document.getElementById('mTitle').textContent=c.referencia;
+    +'<div class="sec">Numeración (corrida)</div><div class="opts">'+corr+'</div>'
+    +'<div class="meta" style="margin-top:10px;font-size:12px">Corrida: '+co.corridaText+'<br>Pares por bulto: '+co.paresBulto+' · Stock: '+rem+' prs</div>'
+    +'<div class="vinfo"><div class="p">'+fmt(co.precio)+' <small>/par · bulto '+fmt(co.precio*co.paresBulto)+'</small></div></div>'
+    +stepperHTML(mState.qty)
+    +'<div id="mAlert"></div>'
+    +'<button class="btn" style="margin-top:12px" onclick="addVariant()">Agregar bulto al pedido</button>';
+  document.getElementById('mTitle').textContent=c.referencia;refreshAlert();
 }
-function escColor(id){mState.cardId=id;mState.rowQty={};renderEscModal();}
-function escRow(i,d){var c=byId[mState.cardId];var co=c.corridas[i];var q=(mState.rowQty[i]||0)+d;if(q<0)q=0;
-  if(NO_OVERSELL){var mx=maxBultos('esc|'+c.estilo+'|'+co.corrida,co.stock,co.paresBulto);if(q>mx)q=mx;}
-  mState.rowQty[i]=q;renderEscModal();}
-function addEscSelected(){var c=byId[mState.cardId];var n=0;
-  c.corridas.forEach((co,i)=>{var q=mState.rowQty[i]||0;if(q>0){addLine({key:'esc|'+c.estilo+'|'+co.corrida,cardId:c.id,kind:'escolar',marca:'GIMBO KIDS',label:c.referencia,sub:'Corrida '+co.corrida,unit:'blt',basis:'par',invUnit:'blt',precio:co.precio,paresBulto:co.paresBulto,stock:co.stock,qty:q});n++;}});
-  if(n){closeAll();}else{alert('Elige al menos una cantidad.');}
-}
+function escColor(id){mState.cardId=id;mState.corrida=0;renderEscModal();}
+function escCorrida(i){mState.corrida=i;renderEscModal();}
 /* media */
 function mFirstAltura(c,col){var a=c.variants.filter(v=>v.color===col).map(v=>v.altura);return a[0];}
 function mFirstTalla(c,col,alt){var t=c.variants.filter(v=>v.color===col&&v.altura===alt).map(v=>v.talla);return t[0];}
-function renderMedModal(){var c=byId[mState.cardId];if(!mState.rowQty)mState.rowQty={};
-  var gimgs=(c.imgs&&c.imgs.length)?c.imgs:[];
+function renderMedModal(){var c=byId[mState.cardId];
+  var vv=c.variants.find(x=>x.color===mState.color&&x.altura===mState.altura&&x.talla===mState.talla);
+  var gimgs=(vv&&vv.imgs&&vv.imgs.length)?vv.imgs:(c.imgs&&c.imgs.length?c.imgs:[]);
   var photo=gimgs.length?'<div class="gal galwrap">'+gimgs.map(i=>'<img src="'+IMAGES[i]+'">').join('')+'</div>':'<div class="mphoto ph">GK</div>';
   var colors=c.colors.length>1?'<div class="sec">Color</div><div class="opts">'+c.colors.map(x=>'<div class="opt'+(x===mState.color?' on':'')+'" onclick="medSet(\'color\',\''+x+'\')">'+x+'</div>').join('')+'</div>':'';
   var alturasAv=[...new Set(c.variants.filter(v=>v.color===mState.color).map(v=>v.altura))];
-  var alt=alturasAv.length>1?'<div class="sec">Altura</div><div class="opts">'+alturasAv.map(x=>'<div class="opt'+(x===mState.altura?' on':'')+'" onclick="medSet(\'altura\',\''+x+'\')">'+x+'</div>').join('')+'</div>':'';
-  var vs=c.variants.filter(v=>v.color===mState.color&&v.altura===mState.altura);
-  var rows=vs.map(v=>{var key='med|'+c.estilo+'|'+v.color+'|'+v.altura+'|'+v.talla;var q=mState.rowQty[key]||0;var rem=remPares(key,v.stock);
-    return '<div class="vrow"><div class="vlbl">Talla '+v.talla+'<small>'+fmt(v.precio)+'/docena · '+rem+' prs</small></div>'
-      +'<div class="stepper sm"><button onclick="medRow(\''+key+'\',-1)">−</button><div class="q">'+q+'</div><button onclick="medRow(\''+key+'\',1)">+</button></div></div>';}).join('');
-  document.getElementById('mBody').innerHTML=photo+colors+alt
-    +'<div class="sec">Talla — elige una o varias</div>'+rows
-    +'<button class="btn" style="margin-top:14px" onclick="addMedSelected()">Agregar al carrito</button>';
-  document.getElementById('mTitle').textContent=c.referencia;
+  var alt='<div class="sec">Altura</div><div class="opts">'+alturasAv.map(x=>'<div class="opt'+(x===mState.altura?' on':'')+'" onclick="medSet(\'altura\',\''+x+'\')">'+x+'</div>').join('')+'</div>';
+  var tallasAv=[...new Set(c.variants.filter(v=>v.color===mState.color&&v.altura===mState.altura).map(v=>v.talla))];
+  var tal='<div class="sec">Talla</div><div class="opts">'+tallasAv.map(x=>'<div class="opt'+(x===mState.talla?' on':'')+'" onclick="medSet(\'talla\',\''+x+'\')">'+x+'</div>').join('')+'</div>';
+  var rem=vv?remPares('med|'+c.estilo+'|'+mState.color+'|'+mState.altura+'|'+mState.talla,vv.stock):0;
+  document.getElementById('mBody').innerHTML=photo+colors+alt+tal
+    +'<div class="meta" style="margin-top:10px;font-size:12px">Empaque: 1 docena (12 pares) por talla · Stock: '+rem+' prs</div>'
+    +'<div class="vinfo"><div class="p">'+fmt(vv?vv.precio:0)+' <small>/docena</small></div></div>'
+    +stepperHTML(mState.qty)
+    +'<div id="mAlert"></div>'
+    +'<button class="btn" style="margin-top:12px" onclick="addVariant()">Agregar docena(s) al pedido</button>';
+  document.getElementById('mTitle').textContent=c.referencia;refreshAlert();
 }
 function medSet(k,v){var c=byId[mState.cardId];mState[k]=v;
-  if(k==='color'){mState.altura=mFirstAltura(c,v);}
+  if(k==='color'){mState.altura=mFirstAltura(c,v);mState.talla=mFirstTalla(c,v,mState.altura);}
+  if(k==='altura'){mState.talla=mFirstTalla(c,mState.color,v);}
   renderMedModal();
-}
-function medRow(key,d){var c=byId[mState.cardId];var p=key.split('|');var v=c.variants.find(x=>x.color===p[2]&&x.altura===p[3]&&x.talla===p[4]);var q=(mState.rowQty[key]||0)+d;if(q<0)q=0;
-  if(NO_OVERSELL&&v){var mx=maxBultos(key,v.stock,v.paresBulto);if(q>mx)q=mx;}
-  mState.rowQty[key]=q;renderMedModal();}
-function addMedSelected(){var c=byId[mState.cardId];var n=0;
-  Object.keys(mState.rowQty).forEach(key=>{var q=mState.rowQty[key];if(q>0){var p=key.split('|');var v=c.variants.find(x=>x.color===p[2]&&x.altura===p[3]&&x.talla===p[4]);if(v){addLine({key:key,cardId:c.id,kind:'media',marca:'GIMBO KIDS',label:c.referencia,sub:p[2]+' · '+p[3]+' · '+p[4],unit:'doc',basis:'doc',invUnit:'blt',precio:v.precio,paresBulto:v.paresBulto,stock:v.stock,qty:q});n++;}}});
-  if(n){closeAll();}else{alert('Elige al menos una cantidad.');}
 }
 /* agregar variantes */
 function addSimple(id){var c=byId[id];var q=mState.qty;if(NO_OVERSELL){var mx=maxBultos(c.id,c.stock,c.paresBulto);if(q>mx)q=mx;}if(q<=0){closeAll();return;}order[id]={key:id,cardId:id,kind:'simple',marca:c.marca,label:c.referencia,sub:c.color+' · T '+(c.talla||''),unit:'blt',basis:'par',precio:c.precio,paresBulto:c.paresBulto,stock:c.stock,qty:q};
-  updateCart();renderLines();render();closeAll();}
+  updateCart();renderLines();render();closeAll();openDrawer();}
 function addVariant(){var c=byId[mState.cardId];var meta;
   if(mState.kind==='escolar'){var co=c.corridas[mState.corrida];
     meta={key:'esc|'+c.estilo+'|'+co.corrida,cardId:c.id,kind:'escolar',marca:'GIMBO KIDS',label:c.referencia,sub:'Corrida '+co.corrida,unit:'blt',basis:'par',precio:co.precio,paresBulto:co.paresBulto,stock:co.stock,qty:mState.qty};
   } else {var v=c.variants.find(x=>x.color===mState.color&&x.altura===mState.altura&&x.talla===mState.talla);if(!v){return;}
     meta={key:'med|'+c.estilo+'|'+mState.color+'|'+mState.altura+'|'+mState.talla,cardId:c.id,kind:'media',marca:'GIMBO KIDS',label:c.referencia,sub:mState.color+' · '+mState.altura+' · '+mState.talla,unit:'doc',basis:'doc',precio:v.precio,paresBulto:v.paresBulto,stock:v.stock,qty:mState.qty};
   }
-  addLine(meta);closeAll();
+  addLine(meta);closeAll();openDrawer();
 }
 
 /* ---- cart ---- */
@@ -760,14 +748,11 @@ function buildPedidoDoc(){const {jsPDF}=window.jspdf;var doc=new jsPDF({unit:'pt
   doc.text('Fecha: '+hoy,W-40,y,{align:'right'});y+=15;
   if(document.getElementById('fTel').value.trim()){doc.text('Tel: '+document.getElementById('fTel').value.trim(),40,y);y+=15;}
   if(document.getElementById('fVend').value.trim()){doc.text('Tomado por: '+document.getElementById('fVend').value.trim(),40,y);y+=15;}
-  var lines=Object.values(order);
-  var rowImgs=lines.map(l=>{var cc=byId[l.cardId];return (cc&&cc.imgs&&cc.imgs.length)?IMAGES[cc.imgs[0]]:null;});
-  var tot=0,anyOver=false;var body=lines.map((l,i)=>{var s=subDeLinea(l);tot+=s;var over=overLinea(l);if(over)anyOver=true;
-    return [i+1,'',l.label+' — '+l.sub+(over?' (!)':''),l.qty+' '+l.unit,paresDeLinea(l),fmt(l.precio)+'/'+(l.basis==='doc'?'doc':'par'),fmt(s)];});
-  doc.autoTable({startY:y+6,head:[['#','Foto','Detalle','Cant','Prs','Precio','Subtotal']],body:body,
-    styles:{font:'helvetica',fontSize:9,cellPadding:4,minCellHeight:34,valign:'middle'},headStyles:{fillColor:[0,173,216],textColor:255},
-    columnStyles:{0:{cellWidth:20},1:{cellWidth:38,halign:'center'},3:{cellWidth:46},4:{cellWidth:30},5:{cellWidth:60},6:{cellWidth:58,halign:'right'}},
-    didDrawCell:function(data){if(data.section==='body'&&data.column.index===1){var url=rowImgs[data.row.index];if(url){try{doc.addImage(url,'JPEG',data.cell.x+(data.cell.width-30)/2,data.cell.y+2,30,30);}catch(e){}}}}});
+  var tot=0,anyOver=false;var body=Object.values(order).map((l,i)=>{var s=subDeLinea(l);tot+=s;var over=overLinea(l);if(over)anyOver=true;
+    return [i+1,l.label+' — '+l.sub+(over?' (!)':''),l.qty+' '+l.unit,paresDeLinea(l),fmt(l.precio)+'/'+(l.basis==='doc'?'doc':'par'),fmt(s)];});
+  doc.autoTable({startY:y+6,head:[['#','Detalle','Cant','Prs','Precio','Subtotal']],body:body,
+    styles:{font:'helvetica',fontSize:9,cellPadding:4},headStyles:{fillColor:[0,173,216],textColor:255},
+    columnStyles:{0:{cellWidth:24},2:{cellWidth:52},3:{cellWidth:40},4:{cellWidth:70},5:{cellWidth:64,halign:'right'}}});
   var fy=doc.lastAutoTable.finalY+18;doc.setFont('helvetica','bold');doc.setFontSize(13);doc.text('TOTAL: '+fmt(tot),W-40,fy,{align:'right'});
   if(anyOver){fy+=18;doc.setTextColor(225,29,72);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('ALERTA: el pedido supera el stock disponible en este equipo (sobreventa).',40,fy);}
   if(document.getElementById('fObs').value.trim()){fy+=18;doc.setTextColor(90,90,90);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text('Obs: '+document.getElementById('fObs').value.trim(),40,fy);}
